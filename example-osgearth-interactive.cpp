@@ -17,6 +17,41 @@
 #include <osgEarth/ExampleResources>
 #include <osgEarth/LatLongFormatter>
 
+#include <ranges>
+
+template<std::ranges::input_range R, typename T>
+constexpr bool contains(R&& r, const T& value) {
+	return std::ranges::find(r, value) != std::ranges::end(r);
+}
+
+class MouseDebugHandler: public osgGA::GUIEventHandler {
+public:
+	virtual bool handle(const osgGA::GUIEventAdapter& ea, osgGA::GUIActionAdapter& aa) override {
+		/* if(
+			ea.getEventType() != osgGA::GUIEventAdapter::PUSH ||
+			ea.getButton() != osgGA::GUIEventAdapter::LEFT_MOUSE_BUTTON
+		) return false; */
+
+		if(!contains(std::array{
+			osgGA::GUIEventAdapter::PUSH,
+			osgGA::GUIEventAdapter::RELEASE,
+			osgGA::GUIEventAdapter::DRAG
+		}, ea.getEventType())) return false;
+
+		OSG_WARN << " >> MouseDebug: "
+			<< "event=" << ea.getEventType()
+			<< ", button=" << ea.getButton()
+			<< ", x=" << ea.getX()
+			<< ", y=" << ea.getY()
+			<< std::endl
+		;
+
+		return false;
+	}
+};
+
+
+
 class ClickToLatLonHandler: public osgGA::GUIEventHandler {
 public:
 	ClickToLatLonHandler(osgEarth::MapNode* mapNode): _mapNode(mapNode) {}
@@ -63,6 +98,8 @@ Q_OBJECT
 public:
 	OSGWidget(QWidget* parent=nullptr):
 	QOpenGLWidget(parent) {
+		// setMouseTracking(true);
+
 		_timer = new QTimer(this);
 
 		connect(_timer, &QTimer::timeout, this, QOverload<>::of(&OSGWidget::update));
@@ -79,17 +116,17 @@ public:
 
 			switch(event->button()) {
 				case Qt::LeftButton:
-					button = osgGA::GUIEventAdapter::LEFT_MOUSE_BUTTON;
+					button = 1; // osgGA::GUIEventAdapter::LEFT_MOUSE_BUTTON;
 
 					break;
 
 				case Qt::MiddleButton:
-					button = osgGA::GUIEventAdapter::MIDDLE_MOUSE_BUTTON;
+					button = 2; // osgGA::GUIEventAdapter::MIDDLE_MOUSE_BUTTON;
 
 					break;
 
 				case Qt::RightButton:
-					button = osgGA::GUIEventAdapter::RIGHT_MOUSE_BUTTON;
+					button = 3; // osgGA::GUIEventAdapter::RIGHT_MOUSE_BUTTON;
 
 					break;
 
@@ -99,15 +136,18 @@ public:
 		}
 
 		std::string buttonName() const {
-			if(button == osgGA::GUIEventAdapter::LEFT_MOUSE_BUTTON) return "LEFT_MOUSE";
+			// if(button == osgGA::GUIEventAdapter::LEFT_MOUSE_BUTTON) return "LEFT_MOUSE";
+			if(button == 1) return "LEFT_MOUSE";
 
-			else if(button == osgGA::GUIEventAdapter::RIGHT_MOUSE_BUTTON) return "RIGHT_MOUSE";
+			// else if(button == osgGA::GUIEventAdapter::RIGHT_MOUSE_BUTTON) return "RIGHT_MOUSE";
+			else if(button == 3) return "RIGHT_MOUSE";
 
-			else return "";
+			else return "MIDDLE_MOUSE";
 		}
 
 		friend std::ostream& operator<<(std::ostream& os, const MouseEventData& med) {
-			return os << med.x << "x" << med.y << " (" << med.buttonName() << ")";
+			// return os << med.x << "x" << med.y << " (" << med.buttonName() << ")";
+			return os << med.x << "x" << med.y << " (" << med.button << ")";
 		}
 
 		float x = 0.0f;
@@ -115,7 +155,8 @@ public:
 
 		// TODO: This isn't really ideal, and is the ENTIRE REASON "enum class" exists (to prevent these
 		// kinds of shenanigans); it'll have to do for now.
-		osgGA::GUIEventAdapter::MouseButtonMask button = static_cast<osgGA::GUIEventAdapter::MouseButtonMask>(0);
+		// osgGA::GUIEventAdapter::MouseButtonMask button = static_cast<osgGA::GUIEventAdapter::MouseButtonMask>(0);
+		unsigned int button = 0;
 	};
 
 protected:
@@ -139,6 +180,7 @@ protected:
 		_viewer->setThreadingModel(osgViewer::Viewer::SingleThreaded);
 		_viewer->setCameraManipulator(new osgEarth::EarthManipulator());
 		_viewer->addEventHandler(new ClickToLatLonHandler(node));
+		_viewer->addEventHandler(new MouseDebugHandler());
 		_viewer->setSceneData(node);
 
 		osgEarth::MapNodeHelper().configureView(_viewer);
@@ -148,7 +190,7 @@ protected:
 		OSG_WARN << "resizeGL: " << w << " x " << h << std::endl;
 
 		_viewer->getCamera()->setViewport(new osg::Viewport(0, 0, w, h));
-		// _viewer->getCamera()->setProjectionMatrixAsPerspective(30.0f, static_cast<double>(w) / h, 1.0, 1000.0);
+		_viewer->getCamera()->setProjectionMatrixAsPerspective(30.0f, static_cast<double>(w) / h, 1.0, 1000.0);
 	}
 
 	void paintGL() override {

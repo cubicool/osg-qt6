@@ -39,6 +39,7 @@ function(EXAMPLE_EXE name)
 		# "D:/Dev/local/lib"
 		"/home/cubicool/local/lib"
 	)
+	target_compile_features(example-${name} PUBLIC cxx_std_20)
 endfunction()
 
 example_exe("gl")
