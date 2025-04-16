@@ -124,15 +124,14 @@ protected:
 
 		osgEarth::initialize();
 
-		osgEarth::Map* map = new osgEarth::Map();
-
-		osgEarth::GDALImageLayer* imagery = new osgEarth::GDALImageLayer();
+		auto* map = new osgEarth::Map();
+		auto* imagery = new osgEarth::GDALImageLayer();
 
 		imagery->setURL("../world.tif");
 
 		map->addLayer(imagery);
 
-		osgEarth::MapNode* node = new osgEarth::MapNode(map);
+		auto* node = new osgEarth::MapNode(map);
 
 		_viewer = new osgViewer::Viewer();
 
@@ -188,12 +187,12 @@ protected:
 	}
 
 	void wheelEvent(QWheelEvent* event) override {
-		int delta = static_cast<float>(event->angleDelta().y()) / 120.0f;
+		auto delta = static_cast<float>(event->angleDelta().y()) / 120.0f;
 
 		OSG_WARN << "wheelEvent: " << delta << std::endl;
 
 		_viewer->getEventQueue()->mouseScroll(
-			delta > 0 ?
+			delta > 0.0f ?
 			osgGA::GUIEventAdapter::SCROLL_UP :
 			osgGA::GUIEventAdapter::SCROLL_DOWN
 		);
