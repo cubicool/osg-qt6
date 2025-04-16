@@ -148,7 +148,7 @@ protected:
 	void resizeGL(int w, int h) override {
 		OSG_WARN << "resizeGL: " << w << " x " << h << std::endl;
 
-		// _viewer->getCamera()->setViewport(new osg::Viewport(0, 0, w, h));
+		_viewer->getCamera()->setViewport(new osg::Viewport(0, 0, w, h));
 		// _viewer->getCamera()->setProjectionMatrixAsPerspective(30.0f, static_cast<double>(w) / h, 1.0, 1000.0);
 	}
 
@@ -172,7 +172,7 @@ protected:
 	}
 
 	void mouseMoveEvent(QMouseEvent* event) override {
-		auto med = MouseEventData(event, height());
+		auto med = _mouseEventData(event);
 
 		OSG_WARN << "mouseMoveEvent: " << med << std::endl;
 
@@ -180,7 +180,7 @@ protected:
 	}
 
 	void mouseReleaseEvent(QMouseEvent* event) override {
-		auto med = MouseEventData(event, height());
+		auto med = _mouseEventData(event);
 
 		OSG_WARN << "mouseReleaseEvent: " << med << std::endl;
 
