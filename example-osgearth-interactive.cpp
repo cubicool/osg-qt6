@@ -17,6 +17,7 @@
 #include <osgEarth/ExampleResources>
 #include <osgEarth/LatLongFormatter>
 
+#if 0
 #include <ranges>
 
 template<std::ranges::input_range R, typename T>
@@ -49,8 +50,7 @@ public:
 		return false;
 	}
 };
-
-
+#endif
 
 class ClickToLatLonHandler: public osgGA::GUIEventHandler {
 public:
@@ -180,7 +180,7 @@ protected:
 		_viewer->setThreadingModel(osgViewer::Viewer::SingleThreaded);
 		_viewer->setCameraManipulator(new osgEarth::EarthManipulator());
 		_viewer->addEventHandler(new ClickToLatLonHandler(node));
-		_viewer->addEventHandler(new MouseDebugHandler());
+		// _viewer->addEventHandler(new MouseDebugHandler());
 		_viewer->setSceneData(node);
 
 		osgEarth::MapNodeHelper().configureView(_viewer);
