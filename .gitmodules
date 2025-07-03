@@ -1,0 +1,3 @@
+[submodule "ext/qtgamepadlegacy"]
+	path = ext/qtgamepadlegacy
+	url = https://github.com/pumphaus/qtgamepadlegacy.git

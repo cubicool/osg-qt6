@@ -1,3 +1,5 @@
+//vimrun! ./example-osgearth-interactive
+
 #include <QOpenGLWidget>
 #include <QOpenGLFunctions>
 #include <QApplication>
@@ -16,6 +18,8 @@
 #include <osgEarth/EarthManipulator>
 #include <osgEarth/ExampleResources>
 #include <osgEarth/LatLongFormatter>
+#include <osgEarth/PlaceNode>
+#include <osgEarth/LocalGeometryNode>
 
 #if 0
 #include <ranges>
@@ -39,7 +43,7 @@ public:
 			osgGA::GUIEventAdapter::DRAG
 		}, ea.getEventType())) return false;
 
-		OSG_WARN << " >> MouseDebug: "
+		OE_WARN << " >> MouseDebug: "
 			<< "event=" << ea.getEventType()
 			<< ", button=" << ea.getButton()
 			<< ", x=" << ea.getX()
@@ -75,21 +79,61 @@ public:
 
 			gp.fromWorld(_mapNode->getMapSRS(), wp);
 
-			OSG_WARN << "LatLong: " << osgEarth::Util::LatLongFormatter(
+			OE_WARN << "LatLong: " << osgEarth::Util::LatLongFormatter(
 				osgEarth::Util::LatLongFormatter::AngularFormat::FORMAT_DECIMAL_DEGREES,
 				osgEarth::Util::LatLongFormatter::Options::USE_SUFFIXES
 			).format(gp) << std::endl;
 
+			addIcon(gp);
+
 			return true;
 		}
 
-		else OSG_WARN << "Failed to get LatLon for: " << ea.getX() << "x" << ea.getY() << std::endl;
+		else OE_WARN << "Failed to get LatLon for: " << ea.getX() << "x" << ea.getY() << std::endl;
 
 		return false;
 	}
 
+	void addIcon(const osgEarth::GeoPoint& gp) {
+		osgEarth::Style pm;
+
+		auto* is = pm.getOrCreate<osgEarth::IconSymbol>();
+		auto scale = 0.5;
+
+		is->url().mutable_value().setLiteral("blackdot.png");
+		is->declutter() = false;
+		is->scale() = scale;
+		is->alignment() = osgEarth::IconSymbol::ALIGN_CENTER_CENTER;
+
+		auto* ts = pm.getOrCreate<osgEarth::TextSymbol>();
+
+		ts->size() = 96.0 * scale;
+		ts->halo() = osgEarth::Color("#000000");
+		ts->fill() = osgEarth::Color::White;
+		ts->alignment() = osgEarth::TextSymbol::ALIGN_LEFT_CENTER;
+
+		auto* pn = new osgEarth::PlaceNode(gp, "foo", pm);
+
+		_mapNode->addChild(pn);
+	}
+
 private:
 	osgEarth::MapNode* _mapNode;
+};
+
+class TriangleNode: public osgEarth::LocalGeometryNode {
+public:
+	TriangleNode(const osgEarth::GeoPoint& gp, const osgEarth::Distance& d) {
+		auto* geom = new osgEarth::Polygon();
+		auto s = d.as(osgEarth::Units::METERS) / 2.0;
+
+		geom->push_back(-s, -s, gp.z());
+		geom->push_back(s, -s, gp.z());
+		geom->push_back(0.0, s, gp.z());
+
+		setGeometry(geom);
+		setPosition(gp);
+	}
 };
 
 class OSGWidget: public QOpenGLWidget, protected QOpenGLFunctions {
@@ -98,7 +142,17 @@ Q_OBJECT
 public:
 	OSGWidget(QWidget* parent=nullptr):
 	QOpenGLWidget(parent) {
-		// setMouseTracking(true);
+		QSurfaceFormat format;
+
+		format.setRenderableType(QSurfaceFormat::OpenGL);
+		format.setProfile(QSurfaceFormat::CompatibilityProfile);
+		format.setSamples(4);
+
+		setMouseTracking(true);
+		setAttribute(Qt::WA_MouseTracking);
+		// setMinimumSize(320, 240);
+		setFocusPolicy(Qt::StrongFocus);
+		setFormat(format);
 
 		_timer = new QTimer(this);
 
@@ -113,6 +167,7 @@ public:
 		MouseEventData(QMouseEvent* event, float height) {
 			x = event->position().x();
 			y = height - event->position().y();
+			// y = event->position().y();
 
 			switch(event->button()) {
 				case Qt::LeftButton:
@@ -161,7 +216,7 @@ public:
 
 protected:
 	void initializeGL() override {
-		OSG_WARN << "initializeGL" << std::endl;
+		OE_WARN << "initializeGL; dpr=" << devicePixelRatio() << std::endl;
 
 		osgEarth::initialize();
 
@@ -174,10 +229,32 @@ protected:
 
 		auto* node = new osgEarth::MapNode(map);
 
+#if 0
+		// ======================================
+		osgEarth::Style style;
+
+		style.getOrCreate<osgEarth::PolygonSymbol>()->fill().mutable_value().color() = osgEarth::Color::Red;
+		style.getOrCreate<osgEarth::AltitudeSymbol>()->clamping() = osgEarth::AltitudeSymbol::CLAMP_TO_TERRAIN;
+		style.getOrCreate<osgEarth::AltitudeSymbol>()->technique() = osgEarth::AltitudeSymbol::TECHNIQUE_DRAPE;
+
+		auto* tri = new TriangleNode(
+			osgEarth::GeoPoint(node->getMapSRS(), -117.172, 32.721),
+			osgEarth::Distance(1000, osgEarth::Units::KILOMETERS)
+			// osgEarth::Distance(100, osgEarth::Units::METERS)
+		);
+
+		tri->setStyle(style);
+		tri->setScale(osg::Vec3d(0.5, 0.5, 1.0));
+
+		node->addChild(tri);
+		// =====================================
+#endif
+
 		_viewer = new osgViewer::Viewer();
 
-		_viewer->setUpViewerAsEmbeddedInWindow(0, 0, width(), height());
-		_viewer->setThreadingModel(osgViewer::Viewer::SingleThreaded);
+		_gw = _viewer->setUpViewerAsEmbeddedInWindow(0, 0, width(), height());
+
+		// _viewer->setThreadingModel(osgViewer::Viewer::SingleThreaded);
 		_viewer->setCameraManipulator(new osgEarth::EarthManipulator());
 		_viewer->addEventHandler(new ClickToLatLonHandler(node));
 		// _viewer->addEventHandler(new MouseDebugHandler());
@@ -187,14 +264,17 @@ protected:
 	}
 
 	void resizeGL(int w, int h) override {
-		OSG_WARN << "resizeGL: " << w << " x " << h << std::endl;
+		OE_WARN << "resizeGL: " << w << " x " << h << std::endl;
 
 		_viewer->getCamera()->setViewport(new osg::Viewport(0, 0, w, h));
 		_viewer->getCamera()->setProjectionMatrixAsPerspective(30.0f, static_cast<double>(w) / h, 1.0, 1000.0);
+		_viewer->getEventQueue()->windowResize(0, 0, w, h);
+
+		_gw->resized(0, 0, w, h);
 	}
 
 	void paintGL() override {
-		// OSG_WARN << "paintGL" << std::endl;
+		// OE_WARN << "paintGL" << std::endl;
 
 		_viewer->getCamera()->getGraphicsContext()->setDefaultFboId(defaultFramebufferObject());
 		_viewer->frame();
@@ -204,10 +284,39 @@ protected:
 		return MouseEventData(event, height());
 	}
 
+	void keyPressEvent(QKeyEvent* event) override {
+		if(event->key() == Qt::Key_Space) {
+			OE_WARN << "keyPressEvent: " << event->key() << std::endl;
+
+			// Viewpoint(-76.1938, 39.4541, 0, 0, -90, 756)
+			double zoom = 500.0 + (4.0 * std::pow(2, (22 - std::clamp(static_cast<int>(15), 0, 22)))); // zoom roughly doubles with each level.
+
+			osgEarth::Viewpoint vp(
+				"Target", // name (optional, used for reference)
+				-76.0,
+				39.0,
+				0.0, // altitude
+				0.0, // heading (azimuth, degrees, 0 = north)
+				-90.0, // pitch (tilt, degrees, -90 = straight down)
+				5000 // range from target in meters (eye-to-ground distance)
+			);
+
+			auto* manip = dynamic_cast<osgEarth::Util::EarthManipulator*>(_viewer->getCameraManipulator());
+
+			if(!manip) return;
+
+			OE_WARN << "setViewpoint" << std::endl;
+
+			manip->setViewpoint(vp, 1.0);
+
+			// _viewer->getEventQueue()->keyPress(key, event->key());
+		}
+	}
+
 	void mousePressEvent(QMouseEvent* event) override {
 		auto med = _mouseEventData(event);
 
-		OSG_WARN << "mousePressEvent: " << med << std::endl;
+		OE_WARN << "mousePressEvent: " << med << std::endl;
 
 		_viewer->getEventQueue()->mouseButtonPress(med.x, med.y, med.button);
 	}
@@ -215,7 +324,7 @@ protected:
 	void mouseMoveEvent(QMouseEvent* event) override {
 		auto med = _mouseEventData(event);
 
-		OSG_WARN << "mouseMoveEvent: " << med << std::endl;
+		OE_WARN << "mouseMoveEvent: " << med << std::endl;
 
 		_viewer->getEventQueue()->mouseMotion(med.x, med.y);
 	}
@@ -223,7 +332,7 @@ protected:
 	void mouseReleaseEvent(QMouseEvent* event) override {
 		auto med = _mouseEventData(event);
 
-		OSG_WARN << "mouseReleaseEvent: " << med << std::endl;
+		OE_WARN << "mouseReleaseEvent: " << med << std::endl;
 
 		_viewer->getEventQueue()->mouseButtonRelease(med.x, med.y, med.button);
 	}
@@ -231,7 +340,7 @@ protected:
 	void wheelEvent(QWheelEvent* event) override {
 		auto delta = static_cast<float>(event->angleDelta().y()) / 120.0f;
 
-		OSG_WARN << "wheelEvent: " << delta << std::endl;
+		OE_WARN << "wheelEvent: " << delta << std::endl;
 
 		_viewer->getEventQueue()->mouseScroll(
 			delta > 0.0f ?
@@ -243,11 +352,13 @@ protected:
 private:
 	osg::ref_ptr<osgViewer::Viewer> _viewer;
 
+	osgViewer::GraphicsWindowEmbedded* _gw;
+
 	QTimer* _timer = nullptr;
 };
 
 int main(int argc, char** argv) {
-	QCoreApplication::setAttribute(Qt::AA_UseDesktopOpenGL);
+	// QCoreApplication::setAttribute(Qt::AA_UseDesktopOpenGL);
 
 	QApplication app(argc, argv);
 	QMainWindow mainWindow;

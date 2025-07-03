@@ -44,5 +44,6 @@ endfunction()
 
 example_exe("gl")
 example_exe("osg")
+example_exe("osg-interactive")
 example_exe("osgearth")
 example_exe("osgearth-interactive")
