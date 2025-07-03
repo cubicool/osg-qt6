@@ -100,7 +100,7 @@ public:
 		auto* is = pm.getOrCreate<osgEarth::IconSymbol>();
 		auto scale = 0.5;
 
-		is->url().mutable_value().setLiteral("blackdot.png");
+		is->url().mutable_value().setLiteral("../blackdot.png");
 		is->declutter() = false;
 		is->scale() = scale;
 		is->alignment() = osgEarth::IconSymbol::ALIGN_CENTER_CENTER;
@@ -121,6 +121,7 @@ private:
 	osgEarth::MapNode* _mapNode;
 };
 
+#if 0
 class TriangleNode: public osgEarth::LocalGeometryNode {
 public:
 	TriangleNode(const osgEarth::GeoPoint& gp, const osgEarth::Distance& d) {
@@ -135,6 +136,7 @@ public:
 		setPosition(gp);
 	}
 };
+#endif
 
 class OSGWidget: public QOpenGLWidget, protected QOpenGLFunctions {
 Q_OBJECT
@@ -163,7 +165,8 @@ public:
 
 	struct MouseEventData {
 		// NOTE: We include the HEIGHT so we can account for differences between the QT windows
-		// coords and the OSG window coords.
+		// coords and the OSG window coords. HOWEVER... it doesn't seem to matter whether we do or
+		// not; it still doesn't work (and actually BREAKS OE3's EarthManipulator Y axis)!
 		MouseEventData(QMouseEvent* event, float height) {
 			x = event->position().x();
 			y = height - event->position().y();
@@ -220,6 +223,7 @@ protected:
 
 		osgEarth::initialize();
 
+		// NOTE: NOT SUPPOSED to use `auto*` with the Map! :) How does this work?
 		auto* map = new osgEarth::Map();
 		auto* imagery = new osgEarth::GDALImageLayer();
 
@@ -254,6 +258,7 @@ protected:
 
 		_gw = _viewer->setUpViewerAsEmbeddedInWindow(0, 0, width(), height());
 
+		// NOTE: the setUpViewerAsEmbeddedInWindow set single-threaded for us.
 		// _viewer->setThreadingModel(osgViewer::Viewer::SingleThreaded);
 		_viewer->setCameraManipulator(new osgEarth::EarthManipulator());
 		_viewer->addEventHandler(new ClickToLatLonHandler(node));
@@ -288,17 +293,16 @@ protected:
 		if(event->key() == Qt::Key_Space) {
 			OE_WARN << "keyPressEvent: " << event->key() << std::endl;
 
-			// Viewpoint(-76.1938, 39.4541, 0, 0, -90, 756)
-			double zoom = 500.0 + (4.0 * std::pow(2, (22 - std::clamp(static_cast<int>(15), 0, 22)))); // zoom roughly doubles with each level.
+			double zoom = 500.0 + (4.0 * std::pow(2, (22 - std::clamp(static_cast<int>(15), 0, 22))));
 
 			osgEarth::Viewpoint vp(
-				"Target", // name (optional, used for reference)
+				"Target", // Name (optional, used for reference)
 				-76.0,
 				39.0,
-				0.0, // altitude
-				0.0, // heading (azimuth, degrees, 0 = north)
-				-90.0, // pitch (tilt, degrees, -90 = straight down)
-				5000 // range from target in meters (eye-to-ground distance)
+				0.0, // Altitude
+				0.0, // Heading (azimuth, degrees, 0 = north)
+				-90.0, // Pitch (tilt, degrees, -90 = straight down)
+				5000 // Range from target in meters (eye-to-ground distance)
 			);
 
 			auto* manip = dynamic_cast<osgEarth::Util::EarthManipulator*>(_viewer->getCameraManipulator());
